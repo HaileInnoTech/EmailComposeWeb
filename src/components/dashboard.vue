@@ -97,7 +97,7 @@
       ></textarea>
       <small>Use {image1} , {image2}, {image3},... to insert image</small>
     </div>
-    <div class="mt-3">
+    <div class="mt-3 d-flex justify-content-around">
       <button type="button" class="btn btn-primary mt-2" @click="updatePreview">Preview</button>
       <input type="button" class="btn btn-primary mt-2" value="Send email" @click="sendFormData" />
     </div>
@@ -107,7 +107,14 @@
     <div id="preview-pane" class="card-body mt-1" v-html="previewHtml"></div>
   </div>
 
-  <button type="reset" class="btn btn-warning mt-2 mb-5" @click="resetForm">Reset</button>
+  <h2 class="mt-3">Result</h2>
+  <div v-if="responseData" class="alert alert-success card mt-3" role="alert">
+    Response: {{ responseData }}
+  </div>
+  <div v-if="error" class="alert alert-danger card mt-3" role="alert">Error: {{ error }}</div>
+  <div class="d-flex justify-content-end">
+    <button type="reset" class="btn btn-warning mt-2 mb-5" @click="resetForm">Reset</button>
+  </div>
 </template>
 
 <script>
@@ -128,7 +135,9 @@ export default {
       subject: '',
       emailBody: '',
       imageFiles: [], // New property to store the uploaded image file
-      previewHtml: ''
+      previewHtml: '',
+      responseData: '',
+      error: ''
     }
   },
   mounted() {
@@ -223,15 +232,11 @@ export default {
       emailBodyWithImages = emailBodyWithImages.replace(placeholderRegExp, '')
 
       this.previewHtml = emailBodyWithImages
-      console.log(this.previewHtml)
     },
 
     resetForm() {
-      this.senderEmail = ''
-      this.senderPassword = ''
       this.senderNickname = ''
       this.subject = '' // Use an equal sign, not a comma
-      this.receiverEmail = '' // Use an equal sign, not a comma
       this.emailBody = ''
       this.imageFiles = []
       this.previewHtml = ''
@@ -291,14 +296,15 @@ export default {
           }
         })
 
-        // Handle the response from the server (e.g., show a success message)
         console.log('Response:', response.data)
-        // ... Add your response handling code here
-      } catch (error) {
-        // Handle any errors that occur during the request
-        console.error('Error:', error)
-        // ... Add your error handling code here
-      }
+        if (response.data.status === 'error') {
+          this.error = response.data.message
+          this.responseData = ''
+        } else if (response.data.status === 'success') {
+          this.responseData = response.data.message
+          this.error = ''
+        }
+      } catch (error) {}
     }
   }
 }

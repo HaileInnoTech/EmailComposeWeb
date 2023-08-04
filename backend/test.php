@@ -117,6 +117,7 @@ try {
 
     // Add a success message to the response
     $response['message'] = 'Email sent successfully';
+
 } catch (Exception $e) {
     // Add an error message to the response
     $response['error'] = 'Email could not be sent. Mailer Error: ' . $mail->ErrorInfo;
