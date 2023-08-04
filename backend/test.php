@@ -15,6 +15,7 @@ $senderEmail = null;
 $senderNickname = null;
 $subject = null;
 $senderPassword = null;
+$response = ['status' => 'error', 'message' => 'Invalid request method.'];
 
 // Check if the request method is POST
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
@@ -56,75 +57,70 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             ];
         }
     }
-    $response = ['status' => 'success', 'message' => 'Data received successfully.'];
 
-    // Output all the received data for debugging purposes
-    echo "<h2>Received Data:</h2>";
-    echo "<pre>";
-    echo "Preview HTML: " . $previewHtml . "\n";
-    echo "Sender Email: " . $senderEmail . "\n";
-    echo "Subject: " . $subject . "\n";
-    echo "Sender Nickname: " . $senderNickname . "\n";
-    echo "Sender Password: " . $senderPassword . "\n";
-    echo "Receiver Email: " . $receiverEmail . "\n";
-    echo "Uploaded Images:\n";
-    print_r($images);
-    echo "</pre>";
+    if (!empty($receiverEmail)) {
+        try {
+            $mail = new PHPMailer(true);
+            $mail->SMTPDebug = SMTP::DEBUG_SERVER; // Enable verbose debug output
+            // Server settings for Gmail
+            $mail->isSMTP();
+            $mail->Host = 'smtp.gmail.com';
+            $mail->SMTPAuth = true;
+            $mail->Username = $senderEmail; // Replace with your Gmail username (email address)
+            $mail->Password = $senderPassword; // Replace with your Gmail password
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            $mail->Port = 465;
+
+            // Sender
+            $mail->setFrom($senderEmail, $senderNickname);
+
+            // Recipients
+            $emailList = explode(', ', $receiverEmail);
+            foreach ($emailList as $email) {
+                $mail->addAddress($email);
+            }
+
+            $numImages = count($images); // Number of images to process
+            $imagePaths = [];
+
+            for ($i = 1; $i <= $numImages; $i++) {
+                $imageKey = 'image' . $i;
+                $imagePaths[$imageKey] = __DIR__ . '/uploads/' . $imageKey . '.png';
+                $mail->addEmbeddedImage($imagePaths[$imageKey], $imageKey);
+                $placeholder = '{' . $imageKey . '}';
+                $previewHtml = str_replace($placeholder, '<img src="cid:image' . $i . '">', $previewHtml);
+            }
+
+            // Content
+            $mail->isHTML(true);
+            $mail->Subject = $subject;
+            $mail->Body = $previewHtml;
+            $mail->send();
+            ob_clean();
+            // Add a success message to the response
+            $response['status'] = 'success';
+            $response['message'] = 'Email sent successfully';
+        } catch (Exception $e) {
+            // Log the error without echoing it
+            file_put_contents('smtp_error.log', 'Email could not be sent. Mailer Error: ' . $mail->ErrorInfo, FILE_APPEND);
+            ob_clean();
+            // Add an error message to the response
+            $response['message'] = 'Email could not be sent. Mailer Error: ' . $mail->ErrorInfo;
+        }
+    } else {
+        ob_clean();
+        $response['message'] = 'No email address to send.';
+    }
 } else {
-    // Return an error response if the request method is not POST
-    http_response_code(405); // Method Not Allowed
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
+    ob_clean();
+    http_response_code(405);
 }
-
-
-try {
-    $mail = new PHPMailer(true);
-    $mail->SMTPDebug = SMTP::DEBUG_SERVER; //Enable verbose debug output
-    // Server settings for Gmail
-    $mail->isSMTP();
-    $mail->Host = 'smtp.gmail.com';
-    $mail->SMTPAuth = true;
-    $mail->Username = $senderEmail; // Replace with your Gmail username (email address)
-    $mail->Password = $senderPassword; // Replace with your Gmail password
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-    $mail->Port = 465;
-
-    // Sender
-    $mail->setFrom($senderEmail, $senderNickname);
-
-    // Recipients
-    $emailList = explode(', ', $receiverEmail);
-    foreach ($emailList as $email) {
-        $mail->addAddress($email);
-    }
-
-    $numImages = count($images); // Number of images to process
-    $imagePaths = [];
-
-    for ($i = 1; $i <= $numImages; $i++) {
-        $imageKey = 'image' . $i;
-        $imagePaths[$imageKey] = __DIR__ . '/uploads/' . $imageKey . '.png';
-        $mail->addEmbeddedImage($imagePaths[$imageKey], $imageKey);
-        $placeholder = '{' . $imageKey . '}';
-        $previewHtml = str_replace($placeholder, '<img src="cid:image' . $i . '">', $previewHtml);
-    }
-
-    // Content
-    $mail->isHTML(true);
-    $mail->Subject = $subject;
-    $mail->Body = $previewHtml;
-    $mail->send();
-
-    // Add a success message to the response
-    $response['message'] = 'Email sent successfully';
-
-} catch (Exception $e) {
-    // Add an error message to the response
-    $response['error'] = 'Email could not be sent. Mailer Error: ' . $mail->ErrorInfo;
+if (isset($mail)) {
+    $mail->SMTPDebug = SMTP::DEBUG_OFF;
 }
 echo json_encode($response);
-
 ?>
+
 
 <?php
 function deleteDirectory($dir)
